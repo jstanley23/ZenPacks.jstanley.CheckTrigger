@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    >
+
+    <include package="Products.ZenUtils.extdirect.zope" file="meta.zcml"/>
+
+    <browser:directRouter
+        name="checktrigger_router"
+        for="*"
+        class=".api.CheckTriggerRouter"
+        namespace="Zenoss.remote"
+        permission="zenoss.View"
+        />
+
+    <adapter
+        name="checktrigger"
+        provides=".api.ICheckTriggerFacade"
+        for="*"
+        factory=".api.CheckTriggerFacade"
+        />
+
+
+    <browser:resourceDirectory
+        name="checktrigger"
+        directory="resources"
+        />
+
+    <browser:viewlet
+        name="js-checktrigger"
+        paths="/++resource++checktrigger/js/checkTrigger.js"
+        weight="10"
+        for="*"
+        manager="Products.ZenUI3.browser.interfaces.IJavaScriptSrcManager"
+        class="Products.ZenUI3.browser.javascript.JavaScriptSrcBundleViewlet"
+        permission="zope2.Public"
+        />
+
+    <browser:page
+        name="checkTriggerCommandView"
+        for="*"
+        class=".api.checkTriggerCommandView"
+        permission="zope2.Public"
+        />
+
+</configure>
