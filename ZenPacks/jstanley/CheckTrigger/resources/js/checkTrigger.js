@@ -58,15 +58,15 @@ var addCheckTriggerButton = function(event_grid) {
 
 var setupCheckTriggerButton = function(event_grid) {
     var new_grid = Ext.getCmp('events_grid');
-    var createIncButton = addCheckTriggerButton(new_grid);
+    var createCheckTriggerButton = addCheckTriggerButton(new_grid);
     new_grid.on('selectionchange', function(selectionmodel) {
         var newDisabledValue = !selectionmodel.hasSelection() && selectionmodel.selectState !== 'All',
             history_combo = Ext.getCmp('history_combo'),
             archive = Ext.isDefined(history_combo) ? history_combo.getValue() === 1 : false;
         if (archive) {
-            createIncButton.setDisabled(true);
+            createCheckTriggerButton.setDisabled(true);
         } else {
-            createIncButton.setDisabled(newDisabledValue);
+            createCheckTriggerButton.setDisabled(newDisabledValue);
         }
     });
     new_grid.on('recreateGrid', setupCheckTriggerButton)
