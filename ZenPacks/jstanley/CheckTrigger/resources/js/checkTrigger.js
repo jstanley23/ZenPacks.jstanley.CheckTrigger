@@ -8,9 +8,18 @@ function getSelectedEvids() {
         selected = grid.selModel.getSelection();
     return Ext.pluck(Ext.Array.map(selected, function(value, ind, array) { return value.getData() }), 'evid');
 }
+
 function getSelectedEvents() {
     var grid = Ext.getCmp(gridId);
     return grid.getSelectionModel().getSelection();
+}
+
+function cbChange(obj) {
+    var cbs = document.getElementsByClassName("styleTypeCheckBoxes");
+    for (var i = 0; i < cbs.length; i++) {
+        cbs[i].checked = false;
+    }
+    obj.checked = true;
 }
 
 var addCheckTriggerButton = function(event_grid) {
@@ -21,16 +30,39 @@ var addCheckTriggerButton = function(event_grid) {
         text: 'Check Event',
         menu: {
             items: [{
+                id: 'style_radio',
+                xtype: 'radiogroup',
+                columns: 1,
+                items: [{
+                    boxLabel: _t('Human Readable Output'),
+                    name: 'style_item',
+                    inputValue: 'human',
+                },{
+                    boxLabel: _t('CSV Output'),
+                    name: 'style_item',
+                    inputValue: 'csv',
+                },{
+                    boxLabel: _t('Summary Output'),
+                    name: 'style_item',
+                    inputValue: 'summary',
+                    checked: true,
+                }]
+            },{
+                xtype: 'menuseparator'
+            },{
                 text: 'Test against all triggers',
                 tooltip: 'Test against all triggers',
                 handler: function() {
+                    var style = Ext.ComponentQuery.query('[name=style_item]')[0].getGroupValue();
                     var win = new Zenoss.CommandWindow({
-                        uids: { 'evids': getSelectedEvids(), 'trigger': 'all' },
+                        uids: { 'evids': getSelectedEvids(), 'trigger': 'all', 'style': style },
                         target: 'checkTriggerCommandView',
                         title: _t('Checking events against trigger(s)...')
                     });
                     win.show();
                 }
+            },{
+                xtype: 'menuseparator'
             }]
         }
     });
@@ -42,8 +74,9 @@ var addCheckTriggerButton = function(event_grid) {
                 id: trigger["id"],
                 tooltip: 'Check event(s) against ' + trigger["name"],
                 handler: function() {
+                    var style = Ext.ComponentQuery.query('[name=style_item]')[0].getGroupValue();
                     var win = new Zenoss.CommandWindow({
-                        uids: { 'evids': getSelectedEvids(), 'trigger': trigger["name"] },
+                        uids: { 'evids': getSelectedEvids(), 'trigger': trigger["name"], 'style': style },
                         target: 'checkTriggerCommandView',
                         title: _t('Checking events against trigger(s)...')
                     });

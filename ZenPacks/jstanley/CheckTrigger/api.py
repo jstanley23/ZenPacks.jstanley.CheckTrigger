@@ -25,7 +25,7 @@ class imitationDevice(object):
             eventDetails = occurrence.get('details', [])
             details = { x['name']:x['value'] for x in eventDetails }
         self.ip_address = details.get('zenoss.device.ip_address', [''])[0]
-        self.device_class = details.get('', [''])
+        self.device_class = details.get('zenoss.device.device_class', [''])[0]
         self.production_state = int(details.get('zenoss.device.production_state', [-10])[0])
         self.priority = int(details.get('zenoss.device.priority', [-10])[0])
         self.location = details.get('zenoss.device.location', [''])[0]
@@ -81,6 +81,7 @@ class imitationSubElement(object):
 class imitationEventDetails(object):
     def __init__(self, event):
         occurrence = event.get('occurrence', [{}])[0]
+        #TODO: verify this get
         eventDetails = occurrence.get('details', [])
         for field in eventDetails:
             setattr(self, field['name'], field['value'][0])
@@ -117,26 +118,69 @@ class CheckTriggerFacade(ZuulFacade):
     def checkTrigger(self, dev, evt, elem, sub_elem, zp_det, trigger):
         testFunction = eval('lambda dev, evt, elem, sub_elem, zp_det: ' + trigger)
         result = testFunction(dev, evt, elem, sub_elem, zp_det)
-        return str(result)
+        return result
 
     def checkTriggers(self, evids, trigger):
+        output = {}
         if trigger == 'all':
             triggers = self.getTriggers()
         else:
             triggers = [t for t in self.getTriggers() if t['name'] == trigger]
 
         for event in self.getEventData(evids):
-            header = "-" * 10
             dev, evt, elem, sub_elem, zp_det = self.buildTriggerObjects(event)
-            yield "{} {} {}".format(header, event.get('uuid'), evt.summary)
+            output[event.get('uuid')] = dict(name=evt.summary, results=[])
             for trig in triggers:
                 code = trig['rule']['source']
-                yield "Trigger: {} for Event ({}): {} returned: {}".format(
-                    trig['name'],
-                    event.get('uuid'),
-                    evt.summary,
-                    self.checkTrigger(dev, evt, elem, sub_elem, zp_det, code),
+                output[event.get('uuid')]['results'].append({
+                    'trigger': trig['name'],
+                    'result': self.checkTrigger(
+                        dev, evt,
+                        elem, sub_elem,
+                        zp_det, code,
+                    ),
+                })
+
+        return output
+
+    def formatOutput(self, style, results):
+        if style == 'human':
+            for event in results:
+                data = results[event]
+                header = "-" * 10
+                yield "{} {} - {}".format(header, event, data['name'])
+                for result in data['results']:
+                    yield "Trigger: {} returned: {}".format(
+                        result['trigger'],
+                        str(result['result']),
                 )
+
+        if style == 'csv':
+            yield "evid,eventSummary,trigger,result"
+            for event in results:
+                data = results[event]
+                for result in data['results']:
+                    yield "{},{},{},{}".format(
+                        event,
+                        results[event]['name'],
+                        result['trigger'],
+                        str(result['result']),
+                )
+
+        if style == 'summary':
+            triggerData = {}
+            yield "Summary of how many events evaluated true per trigger"
+            for event in results:
+                data = results[event]
+                for result in data['results']:
+                    if not triggerData.get(result['trigger']):
+                        triggerData[result['trigger']] = 0
+
+                    if result['result']:
+                        triggerData[result['trigger']] += 1
+
+            for trigger in triggerData:
+                yield "    {}: {}".format(trigger, triggerData[trigger])
 
 
 class CheckTriggerRouter(DirectRouter):
@@ -148,9 +192,10 @@ class CheckTriggerRouter(DirectRouter):
         data = facade.getTriggers()
         return DirectResponse.succeed(data=json.dumps(data))
 
-    def checkTriggers(self, evids, trigger=None):
+    def checkTriggers(self, evids, trigger=None, style='human'):
         facade = self._getFacade()
-        data = facade.checkTriggers(evids, trigger)
+        results = facade.checkTriggers(evids, trigger)
+        data = facade.formatOutput(style, results)
         return DirectResponse.succeed(data=data)
 
 
@@ -161,7 +206,10 @@ class checkTriggerCommandView(StreamingView):
         uids = data.get('uids', {})
         evids = uids.get('evids', [])
         trigger = uids.get('trigger')
-        for result in facade.checkTriggers(evids, trigger):
+        style = uids.get('style', 'human')
+        results = facade.checkTriggers(evids, trigger)
+        formatted = facade.formatOutput(style, results)
+        for result in formatted:
             self.write(result)
 
         self.write('Done')
